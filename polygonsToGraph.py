@@ -28,6 +28,8 @@ class Node:
 		self.n_id = n_id
 		self.center = point
 		self.neighbors = []
+		self.type=0
+
 		
 class Polygon:
 	
