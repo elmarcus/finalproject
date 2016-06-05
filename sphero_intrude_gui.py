@@ -124,8 +124,6 @@ class Controller:
         try:
             info_query = rospy.ServiceProxy("apriltags_info", apriltags_info)
             resp = info_query()
-            #time = str(datetime.datetime.now()).replace(' ', '').replace('.','').replace(':','').strip()
-            #f = open('/home/mu/polygons/polygons' + time + '.txt', 'w')
 
             for i in range(len(resp.polygons)):
                 # A polygon (access points using poly.points)
@@ -142,14 +140,18 @@ class Controller:
         #graph = polygonsToGraph.translateToGraph(resp.polygons)
         #polygonsToGraph.visualizeGraph(graph, resp.polygons)
 
-        #astar = AStar.AStar(graph)
-        #self.path = astar.run()
 
+        goal = resp.polygons[0]
 
         #polygonsToGraph.visualizeResultFromNodes(graph, self.path, resp.polygons)
 
-        #load graph
-        #calculate shortest path using A* around obstacle?
+        # load graph
+        #graph = polygonsToGraph.translateToGraph()
+        #graph = polygonsToGraph.loadGraph()
+
+        # calculate shortest path using A* around obstacle?
+        #astar = AStar.AStar(graph)
+        #self.path = astar.run()
         # while AGENT IS NOT IN GOAL
         #   move along path
         #   if BUMP_EVENT
@@ -159,12 +161,24 @@ class Controller:
         #       update graph with ramp enum
         #       increase velocity
         # END WHILE
-        # 
+        #
         # assign first node on the path to be the attractive field -- run path
         #
+
+        while(inGoal(goal)):
+
         self.field = AttractiveField(self.path[0].center, self.close_distance)
     def stop(self):
         self.stop = True
+
+    def inGoal(self, robot_location, goal):
+
+        radius = 10.0
+        dist = math.sqrt( math.pow(robot_location.x - goal['x'], 2) + math.pow(robot_location.y - goal['y'], 2) )
+        if(dist <= radius):
+            return True
+        else
+            return False
 
 
 class SpheroIntrudeForm(QtGui.QWidget):
