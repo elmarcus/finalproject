@@ -1,35 +1,13 @@
 import math, io
-import matplotlib.pyplot as plt
-import matplotlib
+from Graph import Graph, Node, Point
 
 
 step_x = 35.0
 step_y = 30.0
-
-class Graph:
-	
-	def __init__(self):
-		self.nodes = []
-		self.start = -1
-		self.goal = -1
-		
-	def getNodeById(self, n_id):
-		return next((x for x in self.nodes if x.n_id == n_id), None)
-
-class Point:
-	
-	def __init__(self, x, y):
-		self.x = x
-		self.y = y
-		
-class Node:
-	
-	def __init__(self, n_id, point):
-		self.n_id = n_id
-		self.center = point
-		self.neighbors = []
-		self.type=0
-
+left_x = 50.0
+right_x = 750.0
+top_y = 50.0 
+bottom_y = 550.0
 		
 class Polygon:
 	
@@ -56,20 +34,18 @@ def getBorders(polygons):
 			if (point.y < top_y):
 				top_y = point.y
 	return {'left_x': (left_x), 'right_x': (right_x), 'top_y': (top_y), 'bottom_y': (bottom_y)}
-
-def createGrid(polygons, borders):	
-	grid = []
-	i = borders['top_y']
-	while i <= borders['bottom_y']:
-		row = []
-		j = borders['left_x']
-		while j <= borders['right_x']:
-			point = Point(j + step_x/2.0, i + step_y/2.0)
-			row.append(Node(-1, point))
-			j += step_x
-		grid.append(row)
-		i += step_y
-	#nullify the occupied cells
+	
+def getCenter(polygon):
+	xSum = 0.0
+	ySum = 0.0		
+	for point in polygon.points:
+		xSum += point.x	
+		ySum += point.y
+	xSum /= 4.0
+	ySum /= 4.0
+	return  Point(xSum, ySum)
+	
+def nullifyOccupied(polygons, borders, grid):
 	for poly in polygons:
 		left_cell = int((min(poly.points, key=lambda point: point.x).x - borders['left_x'])/ step_x)  
 		right_cell = int((max(poly.points, key=lambda point: point.x).x  - borders['left_x'])/ step_x)
@@ -84,6 +60,22 @@ def createGrid(polygons, borders):
 			if (grid[i][j] != None):
 				grid[i][j].n_id = n_id
 				n_id += 1
+
+def createGrid(polygons, borders):	
+	grid = []
+	i = borders['top_y']
+	c = 0
+	while i <= borders['bottom_y']:
+		row = []
+		j = borders['left_x']
+		while j <= borders['right_x']:
+			c += 1 
+			point = Point(j + step_x/2.0, i + step_y/2.0)
+			row.append(Node(c, point, 0))
+			j += step_x
+		grid.append(row)
+		i += step_y
+	
 	return grid					
 
 def findNeighbors(i, j, grid):
@@ -106,20 +98,31 @@ def findNeighbors(i, j, grid):
 		neighbors.append(grid[i][j-1].n_id)
 			
 	return neighbors
-			
-def translateToGraph(polygons):
+	
+def getGoalNode(grid, goal):
+	for i in range (0, len(grid)-1):	
+		for j in range(0, len(grid[0])-1):
+			if (grid[i][j].center.x <= goal.x and grid[i+1][j+1].center.x > goal.x and
+			grid[i][j].center.y <= goal.y and grid[i+1][j+1].center.y > goal.y):
+				print "goal assigned"
+				return grid[i][j].n_id
+	return -1
+
+# start - Point (x, y)				
+def translateToGraph(start, polygons):
 	graph = Graph()
 	X = []
 	Y = []
 
-	if (len(polygons) == 0):
-		print "no polygons"
+	if (len(polygons) != 1):
+		print "no goal"
 		return graph
-	if (len(polygons[0].points) < 4):
-		print "no polygons"
-		return graph
-	borders = getBorders(polygons)
+	goal = getCenter(polygons[0])
+	
+	#borders = getBorders(polygons)
+	borders = {'left_x': (left_x), 'right_x': (right_x), 'top_y': (top_y), 'bottom_y': (bottom_y)}
 	grid = createGrid(polygons, borders)
+	
 	for i in range(0, len(grid)):
 		for j in range(0, len(grid[i])):
 			if (grid[i][j]):
@@ -129,29 +132,8 @@ def translateToGraph(polygons):
 				X.append(grid[i][j].center.x)
 				Y.append(grid[i][j].center.y)
 
-	for j in range (0, len(grid[0])):	
-		start = False		
-		for i in range(0, len(grid)):
-			if (grid[i][j] != None):
-				print "start assigned"
-				graph.start = grid[i][j].n_id
-				start = True
-				break
-		if (start):
-			break
-
-	j = len(grid[0])-1
-	goal = False		
-	while (j >= 0):
-		for i in range(0, len(grid)):
-			if (grid[i][j] != None):
-				print "goal assigned"
-				graph.goal = grid[i][j].n_id
-				goal = True
-				break
-		j -= 1
-		if (goal):
-			break	
+	graph.setStartNode(start)
+	graph.goal = getGoalNode(grid, goal)
 				
 	return graph
 
@@ -168,175 +150,3 @@ def getPolygonsFromFile(filename):
 			i += 2
 		polygons.append(Polygon(points))
 	return polygons
-
-####visualizations
-	
-def visualizeGraph(graph, poly):
-	#draw nodes
-	nx = []
-	ny = []
-	start = None
-	goal = None
-	for node in graph.nodes:
-		if (node.n_id == graph.start):
-			start = node.center
-		elif (node.n_id == graph.goal):
-			goal = node.center
-		else:
-			nx.append(node.center.x)
-			ny.append(node.center.y)
-	plt.scatter(nx, ny, c=['g']*len(graph.nodes))
-	
-	#draw edges
-	for node in graph.nodes:
-		for n in node.neighbors:
-			n_center = next((x for x in graph.nodes if x.n_id == n), None).center
-			plt.plot([node.center.x, n_center.x], [node.center.y, n_center.y], c='g')
-	
-	#draw plolygons
-	px = []
-	py = []
-	for p in poly:
-		sum_x = 0
-		sum_y = 0
-		for point in p.points:
-			px.append(point.x)
-			py.append(point.y)
-			sum_x += point.x
-			sum_y += point.y
-		px.append(sum_x/4.0)
-		py.append(sum_y/4.0)
-	plt.scatter(px, py, c=['b']*len(px))
-	
-	#draw start & goal
-	plt.scatter([start.x], [start.y], c=['r'])
-	plt.scatter([goal.x], [goal.y], c=['r'])
-
-	plt.show()
-	return 
-
-####for testing		
-def visualizeResult(graph, path, poly):
-	#draw nodes
-	nx = []
-	ny = []
-	start = None
-	goal = None
-	for node in graph.nodes:
-		if (node.n_id == graph.start):
-			start = node.center
-		elif (node.n_id == graph.goal):
-			goal = node.center
-		else:
-			nx.append(node.center.x)
-			ny.append(node.center.y)
-	plt.scatter(nx, ny, c=['g']*len(graph.nodes))
-	
-	#draw edges
-	for node in graph.nodes:
-		for n in node.neighbors:
-			n_center = next((x for x in graph.nodes if x.n_id == n), None).center
-			plt.plot([node.center.x, n_center.x], [node.center.y, n_center.y], c='g')
-	
-	#draw plolygons
-	px = []
-	py = []
-	for p in poly:
-		sum_x = 0
-		sum_y = 0
-		for point in p.points:
-			px.append(point.x)
-			py.append(point.y)
-			sum_x += point.x
-			sum_y += point.y
-		px.append(sum_x/4.0)
-		py.append(sum_y/4.0)
-	plt.scatter(px, py, c=['b']*len(px))
-	
-	#draw start & goal
-	plt.scatter([start.x], [start.y], c=['r'])
-	plt.scatter([goal.x], [goal.y], c=['r'])
-
-	#draw path
-	path_x = []
-	path_y = []
-	for node in path:
-		path_x.append(node.center.x)
-		path_y.append(node.center.y)
-
-	plt.plot(path_x , path_y, c='r')
-
-	plt.show()
-	return 
-
-#for RRT
-def visualizeTree(graph, poly):
-	#draw nodes
-	nx = []
-	ny = []
-	for node in graph.nodes:
-			nx.append(node.center.x)
-			ny.append(node.center.y)
-	plt.scatter(nx, ny, c=['g']*len(graph.nodes))
-	
-	#draw edges
-	for node in graph.edges:
-		plt.plot([node[0].center.x, node[1].center.x], [node[0].center.y, node[1].center.y], c='g')
-	
-	plt.show()
-	return
-
-def visualizeResultFromNodes(graph, path, poly):
-	#draw nodes
-	nx = []
-	ny = []
-	start = None
-	goal = None
-	for node in graph.nodes:
-		if (node.n_id == graph.start):
-			start = node.center
-		elif (node.n_id == graph.goal):
-			goal = node.center
-		else:
-			nx.append(node.center.x)
-			ny.append(node.center.y)
-	plt.scatter(nx, ny, c=['g']*len(graph.nodes))
-	
-	#draw edges
-	for node in graph.nodes:
-		for n in node.neighbors:
-			n_center = next((x for x in graph.nodes if x.n_id == n), None).center
-			plt.plot([node.center.x, n_center.x], [node.center.y, n_center.y], c='g')
-	
-	#draw plolygons
-	px = []
-	py = []
-	for p in poly:
-		sum_x = 0
-		sum_y = 0
-		for point in p.points:
-			px.append(point.x)
-			py.append(point.y)
-			sum_x += point.x
-			sum_y += point.y
-		px.append(sum_x/4.0)
-		py.append(sum_y/4.0)
-	plt.scatter(px, py, c=['b']*len(px))
-	
-	#draw start & goal
-	plt.scatter([start.x], [start.y], c=['r'])
-	plt.scatter([goal.x], [goal.y], c=['r'])
-
-	#draw path
-	prev_node = None
-	for node in path:
-		if (prev_node):
-			plt.plot([prev_node.center.x, node.center.x], [prev_node.center.y, node.center.y], c='r')
-		prev_node = node
-	plt.show()
-	return
-
-####for testing				
-#poly = 	getPolygonsFromFile('polygons2016-05-06134555706541.txt')
-#graph = translateToGraph(poly)
-#visualizeGraph(graph, poly)
