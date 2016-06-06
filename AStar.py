@@ -60,7 +60,7 @@ class AStar:
             return node
         for ne in node.n.neighbors:
             next_node = graph.getNodeById(ne)
-            if next_node.type!=-1:   # if node is not a wall
+            if next_node.n_type!=-1:   # if node is not a wall
                 if (not self.isVisited(next_node.n_id)):
                     h = self.findHeuristic(next_node)
                     d = self.getDistance(node.n, next_node)
@@ -70,7 +70,7 @@ class AStar:
             self.visitedNodes.add(next_node)
             return self.RfindPath(next_node, graph, queue)
 
-	def traverseSolution(self, goal):
+    def traverseSolution(self, goal):
 		node = self.graph.getNodeById(self.graph.goal)
 		self.solution.insert(0, node)
 		next = self.getVisitedById(goal.parent)
@@ -78,7 +78,7 @@ class AStar:
 			self.solution.insert(0, self.graph.getNodeById(next.n.n_id))
 			next = self.getVisitedById(next.parent)
 
-	def run(self):
+    def run(self):
 		node = self.graph.nodes[self.graph.start]
 		h = self.findHeuristic(node)
 		priority_node = PriorityNode(node, h, 0.0, None)
