@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import polygonsToGraph, RRT, AStar
+import polygonsToGraph, AStar
 import sys, rospy, math, datetime 
 from PyQt4 import QtGui, QtCore
 from geometry_msgs.msg import Twist, Pose2D
@@ -8,9 +8,7 @@ from apriltags_intrude_detector.srv import apriltags_intrude
 from apriltags_intrude_detector.srv import apriltags_info
 import math
 from sphero_node.msg import SpheroCollision
-
-
-
+import visualizationTool
 
 class PotentialField:
     
@@ -27,6 +25,7 @@ class PotentialField:
 		self.centerPoint = {'x': xSum, 'y': ySum}
 		self.power = 0
 		self.radius = math.sqrt(math.pow(points[0].x - self.centerPoint['x'], 2) + math.pow(points[0].y - self.centerPoint['y'], 2) )
+        
 
 	def __init__(self, center_pt, radius):
 		self.angle=0.0
@@ -64,7 +63,7 @@ class AttractiveField(PotentialField):
 			return {'x': 0, 'y': 0}
 		else:
 			self.angle = PotentialField.getAngleTo(self, robotLocation) 
-			print self.angle*180/math.pi
+			#print self.angle*180/math.pi
 			deltaX = min(max(self.alpha*(d - self.radius)*math.cos(self.angle), -80), 80)
 			deltaY = min(max(self.alpha*(d - self.radius)*math.sin(self.angle), -80), 80)
             
@@ -75,6 +74,7 @@ class AttractiveField(PotentialField):
 class Controller:
     stop = True # This is set to true when the stop button is pressed
     field = None
+    
 	
     def __init__(self):
         self.cmdVelPub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
@@ -86,6 +86,10 @@ class Controller:
         self.field = None
         self.graph = None
         self.astar = None
+        self.location = None
+        self.collision_number = -1
+        self.startPosition= None
+        self.generations = 1
 
 
     def isCloseTo(self, point1, point2):
@@ -97,7 +101,7 @@ class Controller:
             # if the robot reached the field
             if (self.field.isInsideGoal(robotLocation)):
                 # if this is the goal, stop
-                if (self.current_node_index == len(self.path) - 1):
+                if (self.current_node_index == len(self.path) - 1):       
                     return {'x': 0, 'y': 0}
                 #otherwise, assign next node to be the field
                 self.current_node_index += 1
@@ -109,44 +113,41 @@ class Controller:
             return {'x': 0, 'y': 0}
 
     def collisionEvent(self, robotLocation):
-        twist = Twist()
-        twist.linear.x = 0
-        twist.linear.y = 0
-        twist.linear.z = 0
-        twist.angular.x = 0
-        twist.angular.y = 0
-        twist.angular.z = 0
-        print "FOUND A WALL"
+        self.stop = True
         
-        #stop robit
-        self.cmdVelPub.publish(twist)
         dist = float("inf")
-        closest_node = None
-
-        #find node closest to robitlocation
-        #TODO find fuzz around wall hit area to determine wall area instead of just one pixel
-        #PROPOSITION fuzz created by just blanking out all of the neighbors 
-        for(n in range(0, len(self.graph.nodes))):
-            if(distance(robotLocation, self.graph.nodes[n]) < dist):
-                dist = distance(robotLocation, self.graph.nodes[n])
-                closest_node = n
+        closest_node = self.path[self.current_node_index].n_id
         
+
         #KILL THE NODE
-        self.graph.nodes[closest_node] = -1 #or whatever...
-        self.path = self.astar.run()        
+        self.graph.getNodeById(closest_node).n_type = -1
+        #for n in self.graph.getNodeById(closest_node).neighbors:
+        #    self.graph.setNodeType(n, -1)
+        #if (self.current_node_index >= 2): 
+        #    self.graph.start = self.path[self.current_node_index - 2].n_id
+        self.current_node_index = 0
+        self.astar = AStar.AStar(self.graph)
+        self.path = self.astar.run()
+        #self.path = self.path[0:self.current_node_index+1]
+        #self.path.reverse()
+        self.stop = False
+        self.field = AttractiveField(self.path[0].center, self.close_distance)
+        self.generations += 1       
     
-    def distance(self, point1, node)
-        return math.sqrt( math.pow(point1.x - node.x, 2) + math.pow(point1.y - node.y, 2) )
+    def distance(self, point1, node):
+        return math.sqrt(math.pow(point1.x - node.center.x, 2) + math.pow(point1.y - node.center.y, 2) )
 
     def trackposCallback(self, msg):
-        # This function is continuously called
+        # This function is continuously 
+        self.startPosition= msg
+
         if not self.stop:
             twist = Twist()
             vel = self.getVelocityChange(msg)
             # Change twist.linear.x to be your desired x velocity
-            twist.linear.x = vel['x'] * 0.65  #modify speed based on sphero's charge
+            twist.linear.x = vel['x'] * 0.6 #modify speed based on sphero's charge
             # Change twist.linear.y to be your desired y velocity
-            twist.linear.y = vel['y'] * 0.65
+            twist.linear.y = vel['y'] * 0.6
             twist.linear.z = 0
             twist.angular.x = 0
             twist.angular.y = 0
@@ -154,12 +155,17 @@ class Controller:
 
             self.cmdVelPub.publish(twist)
 
+
     def collisionCallback(self, msg):
         #this function is continuously called
+        print "COLLISION FUNCTION"
+        self.collision_number += 1
         if not self.stop:
+            print "HIT WALL"
             print msg
             self.collisionEvent(msg)
 
+        print "END CALLBACK"
 
     def start(self):
         rospy.wait_for_service("apriltags_info")
@@ -179,18 +185,20 @@ class Controller:
             print "Exception: " + str(e)
         finally:
             self.stop = False
-
-        #graph = polygonsToGraph.translateToGraph(resp.polygons)
-        #polygonsToGraph.visualizeGraph(graph, resp.polygons)
-        #polygonsToGraph.visualizeResultFromNodes(graph, self.path, resp.polygons)
-
-        # load graph
-        graph = polygonsToGraph.translateToGraph()
         
-        # calculate shortest path using A* around obstacle?
-        self.astar = AStar.AStar(graph)
+        self.graph = polygonsToGraph.translateToGraph(resp.polygons)
+        print 'Start Position is: '+ str(self.startPosition)
+
+        self.graph.setStartNode(self.startPosition)
+       # visualizationTool.visualizeGraph(self.graph, resp.polygons)
+        #polygonsToGraph.visualizeResultFromNodes(graph, self.path, resp.polygons)
+        
+
+        # calculate shortest path using A* around obstacle
+        self.astar = AStar.AStar(self.graph)
         self.path = self.astar.run()
 
+        #visualizationTool.visualizeResultFromNodes(self.graph, self.path, resp.polygons)
         # while AGENT IS NOT IN GOAL
         #   move along path
         #   if BUMP_EVENT

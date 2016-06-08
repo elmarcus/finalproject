@@ -30,8 +30,8 @@ class Graph:
 		return -1
 
 	def setStartNode(self, point):
-		self.start = self.getNodeNearPt(point)
-				
+		self.start = self.getNodeNearPt(point)		
+		
 	def saveToFile(self, path):
 		f = open(path, 'w')
 		picklestring = pickle.dumps(self)
