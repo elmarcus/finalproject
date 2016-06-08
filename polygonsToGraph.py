@@ -109,7 +109,7 @@ def getGoalNode(grid, goal):
 	return -1
 
 # start - Point (x, y)				
-def translateToGraph(start, polygons):
+def translateToGraph(polygons):
 	graph = Graph()
 	X = []
 	Y = []
@@ -132,7 +132,6 @@ def translateToGraph(start, polygons):
 				X.append(grid[i][j].center.x)
 				Y.append(grid[i][j].center.y)
 
-	graph.setStartNode(start)
 	graph.goal = getGoalNode(grid, goal)
 				
 	return graph
