@@ -66,27 +66,27 @@ class AStar:
                     d = self.getDistance(node.n, next_node)
                     priority_node = PriorityNode(next_node, h, node.dsf + d, node.n.n_id)
                     queue.insert(priority_node)
-            next_node = queue.pop()
-            self.visitedNodes.add(next_node)
-            return self.RfindPath(next_node, graph, queue)
+        next_node = queue.pop()
+        self.visitedNodes.add(next_node)
+        return self.RfindPath(next_node, graph, queue)
 
     def traverseSolution(self, goal):
-		node = self.graph.getNodeById(self.graph.goal)
-		self.solution.insert(0, node)
-		next = self.getVisitedById(goal.parent)
-		while (next):
-			self.solution.insert(0, self.graph.getNodeById(next.n.n_id))
-			next = self.getVisitedById(next.parent)
+        node = self.graph.getNodeById(self.graph.goal)
+	self.solution.insert(0, node)
+	next = self.getVisitedById(goal.parent)
+	while (next):
+	    self.solution.insert(0, self.graph.getNodeById(next.n.n_id))
+	    next = self.getVisitedById(next.parent)
 
     def run(self):
-		node = self.graph.nodes[self.graph.start]
-		h = self.findHeuristic(node)
-		priority_node = PriorityNode(node, h, 0.0, None)
-		self.queue.insert(priority_node)
-		self.visitedNodes.add(priority_node)
-		goal = self.RfindPath(priority_node, self.graph, self.queue)
-		self.traverseSolution(goal)
-		return self.solution
+        node = self.graph.nodes[self.graph.start]
+        h = self.findHeuristic(node)
+        priority_node = PriorityNode(node, h, 0.0, None)
+        self.queue.insert(priority_node)
+        self.visitedNodes.add(priority_node)
+        goal = self.RfindPath(priority_node, self.graph, self.queue)
+        self.traverseSolution(goal)
+        return self.solution
 
 		
 
