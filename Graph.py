@@ -17,7 +17,7 @@ class Graph:
 		return next((x for x in self.nodes if x.n_id == n_id), None)
 		
 	def setNodeType(self, n_id, n_type) :
-		self.nodes.n_id = n_type
+		self.getNodeById(n_id).n_type = n_type
 		
 	def getNodeNearPt(self, point):
 		if (len(self.nodes) < 2 or len(self.nodes[0].neighbors) < 1):

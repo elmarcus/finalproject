@@ -7,6 +7,9 @@ points = [Point(600, 500), Point(600, 510), Point(610, 500), Point(610, 510)]
 polygons = [polygonsToGraph.Polygon(points)]
 start = Point(51,55)
 graph = polygonsToGraph.translateToGraph(start, polygons)
+graph.setNodeType(24, -1)
+graph.setNodeType(46, -1)
+graph.setNodeType(68, -1)
 visualizationTool.visualizeGraph(graph, polygons)
 astar = AStar.AStar(graph)
 path = astar.run()
