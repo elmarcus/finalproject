@@ -7,6 +7,10 @@ from std_msgs.msg import ColorRGBA, Float32, Bool
 from apriltags_intrude_detector.srv import apriltags_intrude
 from apriltags_intrude_detector.srv import apriltags_info
 import math
+from sphero_node.msg import SpheroCollision
+
+
+
 
 class PotentialField:
     
@@ -56,7 +60,6 @@ class AttractiveField(PotentialField):
 		d = PotentialField.getDistanceTo(self, robotLocation)
 		if (d < self.radius):
 			print "inside goal"
-			print self.radius
 			
 			return {'x': 0, 'y': 0}
 		else:
@@ -76,10 +79,13 @@ class Controller:
     def __init__(self):
         self.cmdVelPub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
         self.trackposSub = rospy.Subscriber("tracked_pos", Pose2D, self.trackposCallback)
+        self.collisionSub = rospy.Subscriber("collision", SpheroCollision, self.collisionCallback)
         self.close_distance = 20.0   
         self.current_node_index = 0
         self.path = []
         self.field = None
+        self.graph = None
+        self.astar = None
 
 
     def isCloseTo(self, point1, point2):
@@ -100,7 +106,37 @@ class Controller:
             delta = self.field.getVelocityChange(robotLocation)
             return delta   
         else:
-            return {'x': 0, 'y': 0}       
+            return {'x': 0, 'y': 0}
+
+    def collisionEvent(self, robotLocation):
+        twist = Twist()
+        twist.linear.x = 0
+        twist.linear.y = 0
+        twist.linear.z = 0
+        twist.angular.x = 0
+        twist.angular.y = 0
+        twist.angular.z = 0
+        print "FOUND A WALL"
+        
+        #stop robit
+        self.cmdVelPub.publish(twist)
+        dist = float("inf")
+        closest_node = None
+
+        #find node closest to robitlocation
+        #TODO find fuzz around wall hit area to determine wall area instead of just one pixel
+        #PROPOSITION fuzz created by just blanking out all of node closest to sphero 
+        for(n in range(0, len(self.graph.nodes))):
+            if(distance(robotLocation, self.graph.nodes[n]) < dist):
+                dist = distance(robotLocation, self.graph.nodes[n])
+                closest_node = n
+        
+        #KILL THE NODE
+        self.graph.nodes[closest_node] = -1 #or whatever...
+        self.path = self.astar.run()        
+    
+    def distance(self, point1, node)
+        return math.sqrt( math.pow(point1.x - node.x, 2) + math.pow(point1.y - node.y, 2) )
 
     def trackposCallback(self, msg):
         # This function is continuously called
@@ -117,6 +153,13 @@ class Controller:
             twist.angular.z = 0
 
             self.cmdVelPub.publish(twist)
+
+    def collisionCallback(self, msg):
+        #this function is continuously called
+        if not self.stop:
+            print msg
+            self.collisionEvent(msg)
+
 
     def start(self):
         rospy.wait_for_service("apriltags_info")
@@ -139,22 +182,19 @@ class Controller:
 
         #graph = polygonsToGraph.translateToGraph(resp.polygons)
         #polygonsToGraph.visualizeGraph(graph, resp.polygons)
-
-
-        goal = resp.polygons[0]
-
         #polygonsToGraph.visualizeResultFromNodes(graph, self.path, resp.polygons)
 
         # load graph
-        #graph = polygonsToGraph.translateToGraph()
-        #graph = polygonsToGraph.loadGraph()
-
+        graph = polygonsToGraph.translateToGraph()
+        
         # calculate shortest path using A* around obstacle?
-        #astar = AStar.AStar(graph)
-        #self.path = astar.run()
+        self.astar = AStar.AStar(graph)
+        self.path = self.astar.run()
+
         # while AGENT IS NOT IN GOAL
         #   move along path
         #   if BUMP_EVENT
+        #       stop sphero
         #       update graph with wall enum
         #       wall hit -- re calculate with wall as obstacle
         #   if RAMP_EVENT
@@ -165,20 +205,13 @@ class Controller:
         # assign first node on the path to be the attractive field -- run path
         #
 
-        while(inGoal(goal)):
-
         self.field = AttractiveField(self.path[0].center, self.close_distance)
+
+
+
     def stop(self):
         self.stop = True
 
-    def inGoal(self, robot_location, goal):
-
-        radius = 10.0
-        dist = math.sqrt( math.pow(robot_location.x - goal['x'], 2) + math.pow(robot_location.y - goal['y'], 2) )
-        if(dist <= radius):
-            return True
-        else
-            return False
 
 
 class SpheroIntrudeForm(QtGui.QWidget):
