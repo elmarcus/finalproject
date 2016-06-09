@@ -33,6 +33,7 @@ class AStar:
         self.queue = PriorityQueue()
         self.solution = []
         self.visitedNodes = Set()
+        self.rampCost = 5
 
     def isVisited(self, n_id):
         visitedNodesArray = list(self.visitedNodes)
@@ -60,12 +61,15 @@ class AStar:
             return node
         for ne in node.n.neighbors:
             next_node = graph.getNodeById(ne)
-#            if next_node.n_type!=-1:   # if node is not a wall
-            if (not self.isVisited(next_node.n_id)):
-                h = self.findHeuristic(next_node)
-                d = self.getDistance(node.n, next_node)
-                priority_node = PriorityNode(next_node, h, node.dsf + d, node.n.n_id)
-                queue.insert(priority_node)
+            if next_node.n_type!=-1:   # if node is not a wall
+                if (not self.isVisited(next_node.n_id)):
+                    h = self.findHeuristic(next_node)
+                    d = self.getDistance(node.n, next_node)
+                    if next_node.n_type==2:   # if node is a ramp
+                        priority_node = PriorityNode(next_node, h, node.dsf + d+self.rampCost, node.n.n_id)                    
+                    else:                    
+                        priority_node = PriorityNode(next_node, h, node.dsf + d, node.n.n_id)
+                    queue.insert(priority_node)
         next_node = queue.pop()
         self.visitedNodes.add(next_node)
         return self.RfindPath(next_node, graph, queue)

@@ -33,6 +33,7 @@ class AStar:
         self.queue = PriorityQueue()
         self.solution = []
         self.visitedNodes = Set()
+        self.rampCost = 5
 
     def isVisited(self, n_id):
         visitedNodesArray = list(self.visitedNodes)
@@ -64,7 +65,10 @@ class AStar:
                 if (not self.isVisited(next_node.n_id)):
                     h = self.findHeuristic(next_node)
                     d = self.getDistance(node.n, next_node)
-                    priority_node = PriorityNode(next_node, h, node.dsf + d, node.n.n_id)
+                    if next_node.n_type==2:   # if node is a ramp
+                        priority_node = PriorityNode(next_node, h, node.dsf + d+self.rampCost, node.n.n_id)                    
+                    else:                    
+                        priority_node = PriorityNode(next_node, h, node.dsf + d, node.n.n_id)
                     queue.insert(priority_node)
         next_node = queue.pop()
         self.visitedNodes.add(next_node)
@@ -79,6 +83,7 @@ class AStar:
             next = self.getVisitedById(next.parent)
 
     def run(self):
+        print self.graph.start
         node = self.graph.nodes[self.graph.start]
         h = self.findHeuristic(node)
         priority_node = PriorityNode(node, h, 0.0, None)

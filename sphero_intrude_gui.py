@@ -9,6 +9,8 @@ from apriltags_intrude_detector.srv import apriltags_info
 import math
 from sphero_node.msg import SpheroCollision
 import visualizationTool
+from sphero_swarm_node.msg import SpheroHeading
+from time import sleep
 
 class PotentialField:
     
@@ -87,7 +89,6 @@ class Controller:
         self.graph = None
         self.astar = None
         self.location = None
-        self.collision_number = -1
         self.startPosition= None
         self.generations = 1
         self.nodes_per_generation = 0
@@ -116,10 +117,22 @@ class Controller:
 
     def collisionEvent(self, robotLocation):
         self.stop = True
+        sleep(1) # sleep 1 seconds
+        twist = Twist()
+        vel = self.getVelocityChange(robotLocation)
+        twist.linear.x = -twist.linear.x 
+        twist.linear.y = -twist.linear.y
+        #twist.linear.z = 0
+        #twist.angular.x = 0
+        #twist.angular.y = 0
+        #twist.angular.z = 0
+
+
         
         dist = float("inf")
         closest_node = self.path[self.current_node_index].n_id
-        
+       # heading = SpheroHeading(name, 0.0)
+       # self.headingPub.publish(heading)
 
         #KILL THE NODE
         self.graph.getNodeById(closest_node).n_type = -1
@@ -146,10 +159,11 @@ class Controller:
         if not self.stop:
             twist = Twist()
             vel = self.getVelocityChange(msg)
+            speed_coefficient = .65
             # Change twist.linear.x to be your desired x velocity
-            twist.linear.x = vel['x'] * 0.6 #modify speed based on sphero's charge
+            twist.linear.x = vel['x'] * speed_coefficient #modify speed based on sphero's charge
             # Change twist.linear.y to be your desired y velocity
-            twist.linear.y = vel['y'] * 0.6
+            twist.linear.y = vel['y'] * speed_coefficient
             twist.linear.z = 0
             twist.angular.x = 0
             twist.angular.y = 0
@@ -161,7 +175,7 @@ class Controller:
     def collisionCallback(self, msg):
         #this function is continuously called
         print "COLLISION FUNCTION"
-        self.collision_number += 1
+
         if not self.stop:
             print "HIT WALL"
             print msg
@@ -192,6 +206,7 @@ class Controller:
         print 'Start Position is: '+ str(self.startPosition)
 
         self.graph.setStartNode(self.startPosition)
+
        # visualizationTool.visualizeGraph(self.graph, resp.polygons)
         #polygonsToGraph.visualizeResultFromNodes(graph, self.path, resp.polygons)
         
@@ -199,21 +214,6 @@ class Controller:
         # calculate shortest path using A* around obstacle
         self.astar = AStar.AStar(self.graph)
         self.path = self.astar.run()
-
-        #visualizationTool.visualizeResultFromNodes(self.graph, self.path, resp.polygons)
-        # while AGENT IS NOT IN GOAL
-        #   move along path
-        #   if BUMP_EVENT
-        #       stop sphero
-        #       update graph with wall enum
-        #       wall hit -- re calculate with wall as obstacle
-        #   if RAMP_EVENT
-        #       update graph with ramp enum
-        #       increase velocity
-        # END WHILE
-        #
-        # assign first node on the path to be the attractive field -- run path
-        #
 
         self.field = AttractiveField(self.path[0].center, self.close_distance)
 
